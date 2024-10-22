@@ -27,16 +27,16 @@ const test = base.extend({
     } catch (error) {
       console.error("Error in signedInPage fixture:", error)
       // Capture a screenshot for debugging
-      await page.screenshot({ path: `signedin-error-${Date.now()}.png` })
+      // await page.screenshot({ path: `signedin-error-${Date.now()}.png` })
       throw error
     }
   },
 }, { timeout: 120000 }) // Increase timeout to 120 seconds
 
 // Replace the beforeEach hook with the custom fixture
-test.beforeEach(async ({ signedInPage }) => {
+// test.beforeEach(async ({ signedInPage }) => {
   // The page is already signed in, no need to do anything here
-})
+// })
 
 // User Information
 

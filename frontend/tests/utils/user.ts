@@ -34,7 +34,7 @@ export async function signUpNewUser(
   } catch (error) {
     console.error("Error in signUpNewUser:", error)
     // Capture a screenshot for debugging
-    await page.screenshot({ path: `signup-error-${Date.now()}.png` })
+    // await page.screenshot({ path: `signup-error-${Date.now()}.png` })
     throw error
   }
 }

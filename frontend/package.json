@@ -11,7 +11,8 @@
     "generate-client": "openapi-ts --input ./openapi.json --output ./src/client --client axios --exportSchemas true",
     "test": "playwright test",
     "test:ui": "npm run test -- --ui",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:clear": "playwright clear-cache"
   },
   "dependencies": {
     "@chakra-ui/icons": "2.1.1",
