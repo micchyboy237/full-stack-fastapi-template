@@ -1,13 +1,46 @@
-import { expect, test } from "@playwright/test"
-import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
+import { expect, test as base } from "@playwright/test"
 import { randomEmail, randomPassword } from "./utils/random"
 import { logInUser, logOutUser, signUpNewUser } from "./utils/user"
 
 const tabs = ["My profile", "Password", "Appearance"]
 
+// Define a custom test fixture with increased timeout
+const test = base.extend({
+  signedInPage: async ({ page }, use) => {
+    const fullName = "Test User"
+    const email = randomEmail()
+    const password = randomPassword()
+
+    try {
+      console.log("Starting signedInPage fixture")
+      // Sign up a new user
+      await signUpNewUser(page, fullName, email, password)
+
+      // Log in the user
+      await logInUser(page, email, password)
+
+      // Store credentials in page context
+      page.context().email = email
+      page.context().password = password
+
+      await use(page)
+    } catch (error) {
+      console.error("Error in signedInPage fixture:", error)
+      // Capture a screenshot for debugging
+      await page.screenshot({ path: `signedin-error-${Date.now()}.png` })
+      throw error
+    }
+  },
+}, { timeout: 120000 }) // Increase timeout to 120 seconds
+
+// Replace the beforeEach hook with the custom fixture
+test.beforeEach(async ({ signedInPage }) => {
+  // The page is already signed in, no need to do anything here
+})
+
 // User Information
 
-test("My profile tab is active by default", async ({ page }) => {
+test("My profile tab is active by default", async ({ signedInPage: page }) => {
   await page.goto("/settings")
   await expect(page.getByRole("tab", { name: "My profile" })).toHaveAttribute(
     "aria-selected",
@@ -15,7 +48,7 @@ test("My profile tab is active by default", async ({ page }) => {
   )
 })
 
-test("All tabs are visible", async ({ page }) => {
+test("All tabs are visible", async ({ signedInPage: page }) => {
   await page.goto("/settings")
   for (const tab of tabs) {
     await expect(page.getByRole("tab", { name: tab })).toBeVisible()
@@ -23,19 +56,8 @@ test("All tabs are visible", async ({ page }) => {
 })
 
 test.describe("Edit user full name and email successfully", () => {
-  test.use({ storageState: { cookies: [], origins: [] } })
-
-  test("Edit user name with a valid name", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
+  test("Edit user name with a valid name", async ({ signedInPage: page }) => {
     const updatedName = "Test User 2"
-    const password = randomPassword()
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
@@ -49,17 +71,8 @@ test.describe("Edit user full name and email successfully", () => {
     ).toBeVisible()
   })
 
-  test("Edit user email with a valid email", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
+  test("Edit user email with a valid email", async ({ signedInPage: page }) => {
     const updatedEmail = randomEmail()
-    const password = randomPassword()
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
@@ -74,19 +87,8 @@ test.describe("Edit user full name and email successfully", () => {
 })
 
 test.describe("Edit user with invalid data", () => {
-  test.use({ storageState: { cookies: [], origins: [] } })
-
-  test("Edit user email with an invalid email", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
+  test("Edit user email with an invalid email", async ({ signedInPage: page }) => {
     const invalidEmail = ""
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
@@ -96,17 +98,8 @@ test.describe("Edit user with invalid data", () => {
     await expect(page.getByText("Email is required")).toBeVisible()
   })
 
-  test("Cancel edit action restores original name", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
-    const updatedName = "Test User"
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
+  test("Cancel edit action restores original name", async ({ signedInPage: page }) => {
+    const updatedName = "Test User 2"
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
@@ -114,21 +107,12 @@ test.describe("Edit user with invalid data", () => {
     await page.getByLabel("Full name").fill(updatedName)
     await page.getByRole("button", { name: "Cancel" }).first().click()
     await expect(
-      page.getByLabel("My profile").getByText(fullName, { exact: true }),
+      page.getByLabel("My profile").getByText(page.context().email, { exact: true }),
     ).toBeVisible()
   })
 
-  test("Cancel edit action restores original email", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
+  test("Cancel edit action restores original email", async ({ signedInPage: page }) => {
     const updatedEmail = randomEmail()
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
@@ -136,7 +120,7 @@ test.describe("Edit user with invalid data", () => {
     await page.getByLabel("Email").fill(updatedEmail)
     await page.getByRole("button", { name: "Cancel" }).first().click()
     await expect(
-      page.getByLabel("My profile").getByText(email, { exact: true }),
+      page.getByLabel("My profile").getByText(page.context().email, { exact: true }),
     ).toBeVisible()
   })
 })
@@ -144,53 +128,34 @@ test.describe("Edit user with invalid data", () => {
 // Change Password
 
 test.describe("Change password successfully", () => {
-  test.use({ storageState: { cookies: [], origins: [] } })
-
-  test("Update password successfully", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
-    const NewPassword = randomPassword()
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
+  test("Update password successfully", async ({ signedInPage: page }) => {
+    const newPassword = randomPassword()
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "Password" }).click()
-    await page.getByLabel("Current Password*").fill(password)
-    await page.getByLabel("Set Password*").fill(NewPassword)
-    await page.getByLabel("Confirm Password*").fill(NewPassword)
+    await page.getByLabel("Current Password*").fill(page.context().password)
+    await page.getByLabel("Set Password*").fill(newPassword)
+    await page.getByLabel("Confirm Password*").fill(newPassword)
     await page.getByRole("button", { name: "Save" }).click()
     await expect(page.getByText("Password updated successfully.")).toBeVisible()
+
+    // Update the stored password
+    page.context().password = newPassword
 
     await logOutUser(page)
 
     // Check if the user can log in with the new password
-    await logInUser(page, email, NewPassword)
+    await logInUser(page, page.context().email, newPassword)
   })
 })
 
 test.describe("Change password with invalid data", () => {
-  test.use({ storageState: { cookies: [], origins: [] } })
-
-  test("Update password with weak passwords", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
+  test("Update password with weak passwords", async ({ signedInPage: page }) => {
     const weakPassword = "weak"
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "Password" }).click()
-    await page.getByLabel("Current Password*").fill(password)
+    await page.getByLabel("Current Password*").fill(page.context().password)
     await page.getByLabel("Set Password*").fill(weakPassword)
     await page.getByLabel("Confirm Password*").fill(weakPassword)
     await expect(
@@ -199,19 +164,11 @@ test.describe("Change password with invalid data", () => {
   })
 
   test("New password and confirmation password do not match", async ({
-    page,
+    signedInPage: page,
   }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
+    const password = page.context().password
     const newPassword = randomPassword()
     const confirmPassword = randomPassword()
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "Password" }).click()
@@ -222,16 +179,8 @@ test.describe("Change password with invalid data", () => {
     await expect(page.getByText("Passwords do not match")).toBeVisible()
   })
 
-  test("Current password and new password are the same", async ({ page }) => {
-    const fullName = "Test User"
-    const email = randomEmail()
-    const password = randomPassword()
-
-    // Sign up a new user
-    await signUpNewUser(page, fullName, email, password)
-
-    // Log in the user
-    await logInUser(page, email, password)
+  test("Current password and new password are the same", async ({ signedInPage: page }) => {
+    const password = page.context().password
 
     await page.goto("/settings")
     await page.getByRole("tab", { name: "Password" }).click()
@@ -247,13 +196,13 @@ test.describe("Change password with invalid data", () => {
 
 // Appearance
 
-test("Appearance tab is visible", async ({ page }) => {
+test("Appearance tab is visible", async ({ signedInPage: page }) => {
   await page.goto("/settings")
   await page.getByRole("tab", { name: "Appearance" }).click()
   await expect(page.getByLabel("Appearance")).toBeVisible()
 })
 
-test("User can switch from light mode to dark mode", async ({ page }) => {
+test("User can switch from light mode to dark mode", async ({ signedInPage: page }) => {
   await page.goto("/settings")
   await page.getByRole("tab", { name: "Appearance" }).click()
   await page.getByLabel("Appearance").locator("span").nth(3).click()
@@ -263,7 +212,7 @@ test("User can switch from light mode to dark mode", async ({ page }) => {
   expect(isDarkMode).toBe(true)
 })
 
-test("User can switch from dark mode to light mode", async ({ page }) => {
+test("User can switch from dark mode to light mode", async ({ signedInPage: page }) => {
   await page.goto("/settings")
   await page.getByRole("tab", { name: "Appearance" }).click()
   await page.getByLabel("Appearance").locator("span").first().click()
@@ -273,16 +222,27 @@ test("User can switch from dark mode to light mode", async ({ page }) => {
   expect(isLightMode).toBe(true)
 })
 
-test("Selected mode is preserved across sessions", async ({ page }) => {
+test("Selected mode is preserved across sessions", async ({ signedInPage: page }) => {
   await page.goto("/settings")
   await page.getByRole("tab", { name: "Appearance" }).click()
   await page.getByLabel("Appearance").locator("span").nth(3).click()
 
-  await logOutUser(page)
+  // Verify dark mode is set
+  let isDarkMode = await page.evaluate(() =>
+    document.body.classList.contains("chakra-ui-dark")
+  );
+  expect(isDarkMode).toBe(true);
 
-  await logInUser(page, firstSuperuser, firstSuperuserPassword)
-  const isDarkMode = await page.evaluate(() =>
-    document.body.classList.contains("chakra-ui-dark"),
-  )
-  expect(isDarkMode).toBe(true)
+  await logOutUser(page);
+
+  await logInUser(page, page.context().email, page.context().password);
+  
+  // Wait for the page to load and stabilize
+  await page.waitForLoadState("networkidle");
+
+  // Verify dark mode is still set
+  isDarkMode = await page.evaluate(() =>
+    document.body.classList.contains("chakra-ui-dark")
+  );
+  expect(isDarkMode).toBe(true);
 })

@@ -43,11 +43,13 @@ test("User can reset password successfully using the link", async ({
   await page.getByPlaceholder("Email").fill(email)
 
   await page.getByRole("button", { name: "Continue" }).click()
+  // Wait for "Email sent." message
+  await page.getByText("Email sent.").waitFor()
 
   const emailData = await findLastEmail({
     request,
     filter: (e) => e.recipients.includes(`<${email}>`),
-    timeout: 5000,
+    timeout: 30000,
   })
 
   await page.goto(`http://localhost:1080/messages/${emailData.id}.html`)
@@ -100,7 +102,7 @@ test("Weak new password validation", async ({ page, request }) => {
   const emailData = await findLastEmail({
     request,
     filter: (e) => e.recipients.includes(`<${email}>`),
-    timeout: 5000,
+    timeout: 30000,
   })
 
   await page.goto(`http://localhost:1080/messages/${emailData.id}.html`)

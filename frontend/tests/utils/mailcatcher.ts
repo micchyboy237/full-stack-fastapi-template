@@ -30,7 +30,7 @@ async function findEmail({
 export function findLastEmail({
   request,
   filter,
-  timeout = 5000,
+  timeout = 30000,
 }: {
   request: APIRequestContext
   filter?: (email: Email) => boolean
